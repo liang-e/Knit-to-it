@@ -1,6 +1,11 @@
 ## Summary
 Much of the project is adapted from:
 https://medium.com/analytics-vidhya/create-your-own-desktop-pet-with-python-5b369be18868
+
+### Implementation:
+1. clone directory
+2. check image file in the same folder as main.py
+3. import necessary libs
  
 ### Added functionality:
 1. clickable function to change states (left click)
