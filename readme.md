@@ -15,7 +15,7 @@ https://medium.com/analytics-vidhya/create-your-own-desktop-pet-with-python-5b36
 
 ### To do:
 1. make raccoon gifts (knitting, idle, sad) - Emma,
-2. Timer,
+2. Timer - Ryan
 3. images of knitted items,
 4. door button to open room for displaying items,
 5. new window for room for displaying items,
