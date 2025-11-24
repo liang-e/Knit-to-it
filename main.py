@@ -1,26 +1,18 @@
-## import pyautogui ## not needed but it's library has useful function for future applications
-import random
-import tkinter as tk
-import time
-import raccoon_window
 
 import tkinter as tk
-from raccoon_window import launch_pet
-from timer import PomodoroApp
-
-def main():
-    root = tk.Tk()
-    #root.withdraw()  # Optional: hide root if you only want the pet and timer windows
-    launch_pet(state="sad_pomodoro", x=1400, y=700, master=root)
-    PomodoroApp(root)
-    root.mainloop()
+from raccoon_window import RaccoonWindow
 
 if __name__ == "__main__":
-    main()
+    # Raccoon window (main root)
+    pet_window = tk.Tk()
 
+    # Timer window (hidden at start, child of root)
+    timer_window = tk.Toplevel(pet_window)
+    timer_window.withdraw()  # Critical!
 
+    # Create raccoon and link timer
+    raccoon = RaccoonWindow(pet_window)
+    raccoon.timer_window = timer_window  # ← Now it's a proper child window
 
-
-
-
-
+    # Start
+    pet_window.mainloop()
