@@ -99,10 +99,10 @@ class RaccoonWindow:
         self.second_entry.place(x=220, y=30)
 
         # Buttons
-        tk.Button(win, text="Pause", width=8, command=self.__pause_timer).place(x=50, y=120)
-        tk.Button(win, text="Resume", width=8,
-                  command=lambda: self.__start_timer("pomodoro", fresh=False)).place(x=130, y=120)
-        tk.Button(win, text="End", width=8, command=lambda: self.__end_timer("idle")).place(x=210, y=120)
+        #tk.Button(win, text="Pause", width=8, command=self.__pause_timer).place(x=50, y=120)
+        #tk.Button(win, text="Resume", width=8,
+        #          command=lambda: self.__start_timer("pomodoro", fresh=False)).place(x=130, y=120)
+        #tk.Button(win, text="End", width=8, command=lambda: self.__end_timer("idle")).place(x=210, y=120)
 
 
     # use on user selection
@@ -142,7 +142,7 @@ class RaccoonWindow:
         else:
             self.timer_running = False
             messagebox.showinfo("Done!", "Time's up!")
-            self.__end_timer("sad_idle")
+            #self.__end_timer("sad_idle")
 
     # use on user selection
     def __pause_timer(self):
@@ -167,9 +167,12 @@ class RaccoonWindow:
         menu = tk.Menu(self.window, tearoff=0)
         if self.state == "pomodoro" or self.state == "sad_pomodoro":
             menu.add_command(label="Pause Pomodoro", command=self.__pause_timer)
-            menu.add_command(label="End Pomodoro", command=lambda: self.__end_timer("idle"))
+            menu.add_command(label="End Pomodoro", command=lambda: self.__end_timer("sad_idle"))
         elif self.state == "sad_idle":  # sad idle
-            menu.add_command(label="Start Pomodoro", command=lambda: self.__set_state("sad_pomodoro"))
+            if self.remaining_seconds == 0:
+                menu.add_command(label="Start Pomodoro", command=lambda: self.__start_timer("sad_pomodoro"))
+            elif self.remaining_seconds > 0:
+                menu.add_command(label="Resume Pomodoro", command=lambda: self.__start_timer("sad_pomodoro", fresh=False))
         else: # idle
             menu.add_command(label="Start Pomodoro", command=self.start_pomodoro)
 
