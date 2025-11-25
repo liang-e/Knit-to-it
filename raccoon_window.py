@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 from tkinter import Entry, StringVar, messagebox
 from PIL import Image, ImageTk
+import random
 
 class RaccoonWindow:
 
@@ -40,16 +41,19 @@ class RaccoonWindow:
         self._after_id = None  # track scheduled countdown job
         self.manual_end = False # if timer ends prematurely
         self.completed_poms = 0
-        self.successful_pom = 4 # 4
+        self.successful_pom = 1 # 4
         self.pom_length = 1 # 25
         self.rest_timer = 0
-        self.rest_length = 0 # 5
-        self.long_rest_length = 30 # 30
+        self.rest_length = 1 # 5
+        self.long_rest_length = 1 # 30
         self.rest_length_penalty = 1 # 5
         self.penalty_timer = 0
         self.is_rest = False
         self.time_til_happy = 0
 
+        # knits
+        self.knit_window = None
+        self.knit_collection = []
 
         # window setup
         self.window.geometry(f"{dimension}x{dimension}+{x}+{y}")
@@ -102,14 +106,58 @@ class RaccoonWindow:
         elif state == "sad_pomodoro":
             self.gif = self.raccoon_sad_knitting
 
+# -- knit stuff --
+
+    def __draw_knits(self):
+        if self.knit_window is None:
+            self.knit_window = tk.Toplevel(self.window)
+        knit_win = self.knit_window
+        knit_win.geometry("360x200+1528+800")
+        knit_win.title("Pomo's Knit Collection")
+        knit_win.resizable(False, False)
+        knit_win.wm_attributes('-transparentcolor', 'red')
+
+        self.knit_canvas = tk.Canvas(self.knit_window, width=360, height=200, highlightthickness=0, bg='red')
+        self.knit_canvas.pack()
+        self.knit_canvas.delete("all")
+
+        x_offset = 10
+        for knit in self.knit_collection:
+            self.knit_canvas.create_image(x_offset, 0, anchor="nw", image=knit)
+            x_offset += 10
+
+    def __create_new_knit(self):
+        knit_impath = os.path.join(os.path.dirname(__file__), 'clothing-images', '')
+        base_sweater = Image.open(os.path.join(knit_impath, 'sweater128.png'))
+
+        pixel_map = base_sweater.load()
+        width, height = base_sweater.size
+
+        filter_r = (random.randint(1, 255)) / 255
+        filter_g = (random.randint(1, 255)) / 255
+        filter_b = (random.randint(1, 255)) / 255
+
+        for i in range(width):
+            for j in range(height):
+                r, g, b, p = base_sweater.getpixel((i, j))
+                if r != 255:
+                    new_r = int(r * filter_r)
+                    new_g = int(g * filter_g)
+                    new_b = int(b * filter_b)
+
+                    pixel_map[i, j] = (new_r, new_g, new_b, p)
+
+        collection_size = len(self.knit_collection)
+        save_path = os.path.join(knit_impath, f"sweater{collection_size}.png")
+        base_sweater.save(save_path, format="png")
+        return Image.open(os.path.join(knit_impath, f"sweater{collection_size}.png"))
+
     # ---------------------- TIMER UI ----------------------
     def _setup_timer_ui(self):
-        if hasattr(self, 'hour_entry'):  # ← Already built? Do nothing!
+        if hasattr(self, 'canvas'):
             return
-
         if self.timer_window is None:
             self.timer_window = tk.Toplevel(self.window)
-
         win = self.timer_window
         win.geometry("360x200")
         win.title("Pomodoro Timer")
@@ -117,7 +165,6 @@ class RaccoonWindow:
 
         # --- Background image ---
         raw_bg = Image.open(os.path.join(self.impath, 'background.png'))
-        #raw_bg.show()
         resized_bg = raw_bg.resize((360, 200), Image.Resampling.LANCZOS)
         self.timer_bg = ImageTk.PhotoImage(resized_bg)
 
@@ -210,7 +257,8 @@ class RaccoonWindow:
 
                 if self.completed_poms == self.successful_pom:
                     self.__rest_countdown("idle", self.long_rest_length)
-                    # TODO add sweater thing here
+                    self.knit_collection.append(ImageTk.PhotoImage(self.__create_new_knit()))
+                    self.__draw_knits()
                 elif self.state != "sad_pomodoro" or self.time_til_happy <= 0:
                     self.__rest_countdown("idle", self.rest_length)
                 else:
