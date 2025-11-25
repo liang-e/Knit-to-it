@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 from tkinter import Entry, StringVar, messagebox
+from PIL import Image, ImageTk
 
 class RaccoonWindow:
 
@@ -16,6 +17,7 @@ class RaccoonWindow:
         self.raccoon_sad_knitting = [
             tk.PhotoImage(file=self.impath + 'raccoon_sad_knitting.gif', format='gif -index %i' % i) for i in range(2)]
 
+        # Positioning and size
         self.x = x
         self.y = y
         self.dimension = dimension
@@ -28,7 +30,7 @@ class RaccoonWindow:
         self.drag_start_x = 0
         self.drag_start_y = 0
 
-        # Timer Additional from Geeks
+        # Timer variables
         self.hour = StringVar(value="00")
         self.minute = StringVar(value="00")
         self.second = StringVar(value="00")
@@ -49,12 +51,13 @@ class RaccoonWindow:
         self.time_til_happy = 0
 
 
-        # window and pet_label configuration and binding
+        # window setup
         self.window.geometry(f"{dimension}x{dimension}+{x}+{y}")
         self.window.overrideredirect(True)
         self.window.wm_attributes('-transparentcolor', 'red')
         self.window.wm_attributes('-topmost', True)  # Make it top of everything
 
+        # Pet label
         self.pet_label = tk.Label(self.window, bd=0, bg='red')
         self.pet_label.pack()
         self.pet_label.bind('<Button-3>', self.on_right_click)  # Right click
@@ -73,6 +76,8 @@ class RaccoonWindow:
         new_y = self.window.winfo_y() + (event.y - self.drag_start_y)
         self.window.geometry(f'+{new_x}+{new_y}')
         self.x, self.y = new_x, new_y
+
+    # ---------------------- GIF ----------------------
 
     # making gif loop through frames
     def __play_gif(self):
@@ -97,6 +102,7 @@ class RaccoonWindow:
         elif state == "sad_pomodoro":
             self.gif = self.raccoon_sad_knitting
 
+    # ---------------------- TIMER UI ----------------------
     def _setup_timer_ui(self):
         if hasattr(self, 'hour_entry'):  # ← Already built? Do nothing!
             return
@@ -107,31 +113,41 @@ class RaccoonWindow:
         win = self.timer_window
         win.geometry("360x200")
         win.title("Pomodoro Timer")
-        win.configure(bg="#2c3e50")
         win.resizable(False, False)
 
-        # Create and SAVE the widgets so we don't make duplicates
-        self.hour_entry = Entry(win, width=3, font=("Arial", 28), textvariable=self.hour,
-                                state='readonly', readonlybackground="#2c3e50", fg="white", justify='center')
-        self.hour_entry.place(x=60, y=30)
+        # --- Background image ---
+        raw_bg = Image.open(os.path.join(self.impath, 'background.png'))
+        #raw_bg.show()
+        resized_bg = raw_bg.resize((360, 200), Image.Resampling.LANCZOS)
+        self.timer_bg = ImageTk.PhotoImage(resized_bg)
 
-        tk.Label(win, text=":", font=("Arial", 28), bg="#2c3e50", fg="white").place(x=115, y=30)
+        # --- Cartoon timer image ---
+        pil_timer = Image.open(os.path.join(self.impath, "cartoonTimerEditpng.png"))
+        orig_w, orig_h = pil_timer.size
+        scale_factor = min(200 / orig_h, 360 / orig_w)
+        new_w, new_h = int(orig_w * scale_factor), int(orig_h * scale_factor)
+        pil_timer = pil_timer.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        self.timer_image = ImageTk.PhotoImage(pil_timer)
 
-        self.minute_entry = Entry(win, width=3, font=("Arial", 28), textvariable=self.minute,
-                                  state='readonly', readonlybackground="#2c3e50", fg="white", justify='center')
-        self.minute_entry.place(x=140, y=30)
+        # --- Canvas ---
+        self.canvas = tk.Canvas(win, width=360, height=200, highlightthickness=0)
+        self.canvas.pack()
 
-        tk.Label(win, text=":", font=("Arial", 28), bg="#2c3e50", fg="white").place(x=195, y=30)
+        # Draw background first
+        self.canvas.create_image(0, 0, anchor="nw", image=self.timer_bg)
 
-        self.second_entry = Entry(win, width=3, font=("Arial", 28), textvariable=self.second,
-                                  state='readonly', readonlybackground="#2c3e50", fg="white", justify='center')
-        self.second_entry.place(x=220, y=30)
+        # Draw cartoon timer centered
+        self.timer_x, self.timer_y = 180, 100
+        self.canvas.create_image(self.timer_x, self.timer_y, image=self.timer_image)
 
-        # Buttons
-        #tk.Button(win, text="Pause", width=8, command=self.__pause_timer).place(x=50, y=120)
-        #tk.Button(win, text="Resume", width=8,
-        #          command=lambda: self.__start_timer("pomodoro", fresh=False)).place(x=130, y=120)
-        #tk.Button(win, text="End", width=8, command=lambda: self.__end_timer("idle")).place(x=210, y=120)
+        # Overlay countdown text (slightly above center of timer image)
+        self.timer_text_item = self.canvas.create_text(
+            self.timer_x, self.timer_y - 30,
+            text="25:00",
+            font=("DS-Digital", 20),
+            fill="white",
+            anchor="center"
+        )
 
 
     # use on user selection
@@ -169,9 +185,9 @@ class RaccoonWindow:
         # Convert seconds to HH:MM:SS (GFG logic with divmod)
         mins, secs = divmod(timer_length, 60)
         hours, mins = divmod(mins, 60)
-        self.hour.set(f"{hours:02d}")
-        self.minute.set(f"{mins:02d}")
-        self.second.set(f"{secs:02d}")
+        time_str = f"{hours:02d}:{mins:02d}:{secs:02d}"
+        if hasattr(self, 'canvas'):
+            self.canvas.itemconfig(self.timer_text_item, text=time_str)
 
     ##
     def __countdown(self, timer_length):
@@ -246,7 +262,7 @@ class RaccoonWindow:
         self.timer_window.withdraw()
         self.manual_end = True
 
-
+    # ---------------------- MENU ----------------------
     def on_right_click(self, event):
         # Create popup menu
         menu = tk.Menu(self.window, tearoff=0)
