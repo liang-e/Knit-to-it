@@ -24,6 +24,10 @@ class RaccoonWindow:
         self.gif = self.raccoon_idle
         self.frame = 0
 
+        # Drag variables
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+
         # Timer Additional from Geeks
         self.hour = StringVar(value="00")
         self.minute = StringVar(value="00")
@@ -32,6 +36,18 @@ class RaccoonWindow:
         self.timer_running = False
         self.timer_window = None
         self._after_id = None  # track scheduled countdown job
+        self.manual_end = False # if timer ends prematurely
+        self.completed_poms = 0
+        self.successful_pom = 4 # 4
+        self.pom_length = 1 # 25
+        self.rest_timer = 0
+        self.rest_length = 0 # 5
+        self.long_rest_length = 30 # 30
+        self.rest_length_penalty = 1 # 5
+        self.penalty_timer = 0
+        self.is_rest = False
+        self.time_til_happy = 0
+
 
         # window and pet_label configuration and binding
         self.window.geometry(f"{dimension}x{dimension}+{x}+{y}")
@@ -42,8 +58,21 @@ class RaccoonWindow:
         self.pet_label = tk.Label(self.window, bd=0, bg='red')
         self.pet_label.pack()
         self.pet_label.bind('<Button-3>', self.on_right_click)  # Right click
+        self.pet_label.bind('<Button-1>', self.start_drag)
+        self.pet_label.bind('<B1-Motion>', self.on_drag)
 
         self.__play_gif()
+
+    # ---------------------- DRAG ----------------------
+    def start_drag(self, event):
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def on_drag(self, event):
+        new_x = self.window.winfo_x() + (event.x - self.drag_start_x)
+        new_y = self.window.winfo_y() + (event.y - self.drag_start_y)
+        self.window.geometry(f'+{new_x}+{new_y}')
+        self.x, self.y = new_x, new_y
 
     # making gif loop through frames
     def __play_gif(self):
@@ -107,8 +136,9 @@ class RaccoonWindow:
 
     # use on user selection
     def __start_timer(self, state, fresh=True):
+        print("Start timer")
         self.__set_state(state)
-        # TODO set starting time based on time attribute (whether from resuming or from starting)
+
         # lazy-init UI the first time
         if not hasattr(self, 'hour_entry'):
             self._setup_timer_ui()
@@ -118,36 +148,88 @@ class RaccoonWindow:
 
         # ---- set initial time ----
         if fresh and state in ("pomodoro", "sad_pomodoro"):
-            self.remaining_seconds = 25 * 60
-        self.__update_display()
+            self.remaining_seconds = self.pom_length * 60
+        self.is_rest = False
+        self.__update_display(self.remaining_seconds)
         self.timer_running = True
-        self.__countdown()
+        self.__countdown(self.remaining_seconds)
+
+    def __rest_countdown(self, state, length):
+        print("Start rest " + str(length))
+        self.remaining_seconds = 0
+        self.is_rest = True
+        self.rest_timer = length * 60
+        self.__set_state(state)
+        self.__update_display(self.rest_timer)
+        self.timer_running = True
+        self.__countdown(self.rest_timer)
 
     ##
-    def __update_display(self):
+    def __update_display(self, timer_length):
         # Convert seconds to HH:MM:SS (GFG logic with divmod)
-        mins, secs = divmod(self.remaining_seconds, 60)
+        mins, secs = divmod(timer_length, 60)
         hours, mins = divmod(mins, 60)
         self.hour.set(f"{hours:02d}")
         self.minute.set(f"{mins:02d}")
         self.second.set(f"{secs:02d}")
 
     ##
-    def __countdown(self):
-        if self.timer_running and self.remaining_seconds > 0:
-            self.remaining_seconds -= 1
-            self.__update_display()
-            self._after_id = self.timer_window.after(1000, self.__countdown) #changed
+    def __countdown(self, timer_length):
+        if self.timer_running and timer_length > 0:
+            if self.time_til_happy > 0 and not self.is_rest:
+                self.time_til_happy -= 1
+            if not self.is_rest:
+                self.remaining_seconds -= 1
+            timer_length -= 1
+            self.__update_display(timer_length)
+            self._after_id = self.timer_window.after(1000, self.__countdown, timer_length) #changed
 
         else:
             self.timer_running = False
-            messagebox.showinfo("Done!", "Time's up!")
+            if not self.manual_end and not self.is_rest: #if pom timer ended naturally
+
+                if self.time_til_happy <= 0:
+                    self.completed_poms += 1
+                    print(str(self.completed_poms))
+
+                if self.completed_poms == self.successful_pom:
+                    self.__rest_countdown("idle", self.long_rest_length)
+                    # TODO add sweater thing here
+                elif self.state != "sad_pomodoro" or self.time_til_happy <= 0:
+                    self.__rest_countdown("idle", self.rest_length)
+                else:
+                    self.__rest_countdown("sad_idle", self.rest_length)
+            elif self.is_rest: # if the resting timer ended
+                print("rest over")
+                self.is_rest = False
+                self.penalty_timer = self.rest_length_penalty * 60
+                if self.completed_poms == self.successful_pom:
+                    self.completed_poms = 0
+                self.__check_rest_length()
+            elif self.manual_end:
+                self.__set_state("sad_idle")
+                self.manual_end = False
+
+            #messagebox.showinfo("Done!", "Time's up!")
             #self.__end_timer("sad_idle")
+
+    def __check_rest_length(self):
+        if self.penalty_timer > 0 and self.timer_running == False:
+            self.penalty_timer -= 1
+            self._after_id = self.timer_window.after(1000, self.__check_rest_length)
+        elif self.penalty_timer == 0 and self.timer_running == False:
+            self.__set_state("sad_idle")
+            self.completed_poms = 0
+            self.time_til_happy = self.pom_length * 60
+            self.remaining_seconds = 0
+            print("You Took Too Long To Start The Next Pomodoro. Pomo lost motivation on his project.")
 
     # use on user selection
     def __pause_timer(self):
+        print("Pause")
         self.__set_state("paused")
         self.timer_running = False
+        self.time_til_happy = self.pom_length * 60
         if self._after_id is not None:
             self.timer_window.after_cancel(self._after_id)
             self._after_id = None
@@ -155,11 +237,14 @@ class RaccoonWindow:
 
     # used on user selection and for natural timer ending
     def __end_timer(self, state):
+        print("End timer")
+        self.time_til_happy = self.pom_length * 60
         self.__set_state(state)
         self.remaining_seconds = 0
         self.timer_running = False  # Hide window
-        self.__update_display()
+        self.__update_display(self.remaining_seconds)
         self.timer_window.withdraw()
+        self.manual_end = True
 
 
     def on_right_click(self, event):
@@ -168,11 +253,12 @@ class RaccoonWindow:
         if self.state == "pomodoro" or self.state == "sad_pomodoro":
             menu.add_command(label="Pause Pomodoro", command=self.__pause_timer)
             menu.add_command(label="End Pomodoro", command=lambda: self.__end_timer("sad_idle"))
-        elif self.state == "sad_idle":  # sad idle
+        elif self.state == "sad_idle":
             if self.remaining_seconds == 0:
                 menu.add_command(label="Start Pomodoro", command=lambda: self.__start_timer("sad_pomodoro"))
             elif self.remaining_seconds > 0:
                 menu.add_command(label="Resume Pomodoro", command=lambda: self.__start_timer("sad_pomodoro", fresh=False))
+                menu.add_command(label="End Pomodoro", command=lambda: self.__end_timer("sad_idle"))
         else: # idle
             menu.add_command(label="Start Pomodoro", command=self.start_pomodoro)
 
